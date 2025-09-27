@@ -225,10 +225,6 @@ body {
     height: auto;
 }
 
-.btn-delete:hover {
-    color: #C53030;
-}
-
 /* Обратная связь */
 .feedback {
     text-align: center;

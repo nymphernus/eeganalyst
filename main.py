@@ -2,6 +2,7 @@ from dataset_loader import load_dataset, datasets_list as dtl
 
 import dash
 from dash import dcc, html, Input, Output, State, callback, no_update
+from dash.dependencies import ALL
 
 import plotly.graph_objs as go
 import pandas as pd
@@ -322,16 +323,38 @@ def update_table(anns):
         return html.P("Нет аннотаций", className="feedback")
     df = pd.DataFrame(anns)[['t0', 't1', 'label']]
     return html.Table([
-        html.Thead(html.Tr([html.Th("Начало (сек)"), html.Th("Конец (сек)"), html.Th("Метка")])),
+        html.Thead(html.Tr([
+            html.Th("Начало (сек)"),
+            html.Th("Конец (сек)"),
+            html.Th("Метка"),
+            html.Th("Действие")
+        ])),
         html.Tbody([
             html.Tr([
                 html.Td(f"{r['t0']:.3f}"),
                 html.Td(f"{r['t1']:.3f}"),
-                html.Td(r['label'])
-            ]) for _, r in df.iterrows()
+                html.Td(r['label']),
+                html.Td(html.Button("❌", id={'type': 'delete-btn', 'index': i}, n_clicks=0,
+                                    className="btn btn-delete"))
+            ]) for i, r in df.iterrows()
         ])
     ], className="annotations-table")
 
+@app.callback(
+    Output('annotations-store', 'data', allow_duplicate=True),
+    Input({'type': 'delete-btn', 'index': ALL}, 'n_clicks'),
+    State('annotations-store', 'data'),
+    prevent_initial_call=True
+)
+def delete_annotation(n_clicks_list, anns):
+    if not anns:
+        return anns
+    # ищем индекс кнопки, по которой кликнули
+    for i, n in enumerate(n_clicks_list):
+        if n and n > 0:
+            anns.pop(i)
+            break
+    return anns
 
 @app.callback(
     Output('save-feedback', 'children'),
