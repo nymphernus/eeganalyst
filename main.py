@@ -1,31 +1,29 @@
-# main.py
 from dataset_loader import load_dataset, datasets_list as dtl
+
 import dash
 from dash import dcc, html, Input, Output, State, callback, no_update
+
 import plotly.graph_objs as go
 import pandas as pd
 import numpy as np
-import base64
+
+from base64 import b64decode
 from io import BytesIO
 from datetime import datetime
-import os
+from os import path as ospath, makedirs
+from mne import pick_types
 
 # === Настройки ===
 SAVE_FOLDER = "saved_annotations"
-os.makedirs(SAVE_FOLDER, exist_ok=True)
+makedirs(SAVE_FOLDER, exist_ok=True)
 
 # Инициализация приложения
 app = dash.Dash(__name__)
-app.title = "🧠 MNE EEG Annotator"
+app.title = "Разметка ЭЭГ"
 
 
 # === Макет ===
 app.layout = html.Div([
-    # Заголовок
-    html.Div([
-        html.H1("🧠 Интерактивная разметка ЭЭГ/MEG"),
-        html.P("Работа с датасетами MNE • Выделение участков • Сохранение аннотаций")
-    ], className="app-header"),
 
     # Выбор датасета и загрузка аннотаций
     html.Div([
@@ -74,13 +72,13 @@ app.layout = html.Div([
                     id='window-slider',
                     min=5, max=60, step=1, value=10,
                     marks={i: str(i) for i in range(5, 61, 5)},
-                    tooltip={"placement": "bottom", "always_visible": False}
+                    tooltip={"placement": "bottom"}
                 ),
                 html.Label("Начало окна (сек):", className="slider-label"),
                 dcc.Slider(
                     id='start-slider',
                     min=0, max=100, step=0.1, value=0,
-                    tooltip={"placement": "bottom", "always_visible": False},
+                    tooltip={"placement": "bottom"},
                     className="custom-slider"
                 )
             ], className="settings-col settings-col-right")
@@ -93,7 +91,9 @@ app.layout = html.Div([
         dcc.Graph(
             id='eeg-graph',
             config={
-                'modeBarButtonsToAdd': ['select2d'],
+                'modeBarButtonsToRemove': [
+                    'zoom2d', 'pan2d', 'zoomIn2d', 'zoomOut2d', 'autoScale2d', 'resetScale2d', 'toImage',
+                ],
                 'displayModeBar': True,
                 'displaylogo': False,
                 'toImageButtonOptions': {'format': 'png', 'filename': 'eeg_plot'}
@@ -152,7 +152,6 @@ app.layout = html.Div([
 def update_dataset(dataset_name):
     try:
         raw = load_dataset(dataset_name)
-        from mne import pick_types
         picks = pick_types(raw.info, eeg=True, meg=False, exclude='bads')
         if len(picks) == 0:
             picks = pick_types(raw.info, eeg=False, meg=True, exclude='bads')
@@ -176,7 +175,7 @@ def update_dataset(dataset_name):
 
 def parse_csv(contents, filename):
     content_type, content_string = contents.split(',')
-    decoded = base64.b64decode(content_string)
+    decoded = b64decode(content_string)
     try:
         df = pd.read_csv(BytesIO(decoded)) if 'csv' in filename else None
     except:
@@ -349,7 +348,7 @@ def save_to_disk(_, anns, dataset):
             't0': 'onset', 't1': 'offset', 'label': 'description'
         })
         fname = f"{dataset}_annotations_{datetime.now().strftime('%Y%m%d_%H%M')}.csv"
-        df.to_csv(os.path.join(SAVE_FOLDER, fname), index=False, header=True, encoding='utf-8')
+        df.to_csv(ospath.join(SAVE_FOLDER, fname), index=False, header=True, encoding='utf-8')
         return f"✅ Сохранено: {fname}"
     except Exception as e:
         return f"❌ Ошибка: {str(e)[:50]}"

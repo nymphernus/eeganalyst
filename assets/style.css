@@ -213,6 +213,22 @@ body {
     color: white;
 }
 
+/* Кнопка удаления аннотации */
+.btn-delete {
+    background: none;
+    border: none;
+    color: #E53E3E;
+    cursor: pointer;
+    font-size: 16px;
+    padding: 0;
+    width: auto;
+    height: auto;
+}
+
+.btn-delete:hover {
+    color: #C53030;
+}
+
 /* Обратная связь */
 .feedback {
     text-align: center;
