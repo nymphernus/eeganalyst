@@ -1,3 +1,4 @@
+# dataset_loader.py
 import mne
 from functools import lru_cache
 
@@ -10,6 +11,7 @@ datasets_list = {
 def load_dataset(name: str):
     """
     Загружает датасет из MNE с кэшированием.
+    Возвращает mne.io.Raw.
     """
     if name == "sample":
         data_path = mne.datasets.sample.data_path()
@@ -18,8 +20,14 @@ def load_dataset(name: str):
 
     elif name == "eegbci":
         from mne.datasets import eegbci
+        # Вариант для mne 1.10.1: позиционные аргументы
         files = eegbci.load_data(1, [2])
         raw = mne.io.read_raw_edf(files[0], preload=True)
+        # Попробуем установить стандартный монтаж, если есть EEG-каналы
+        try:
+            raw.set_montage('standard_1005', on_missing='ignore')
+        except Exception:
+            pass
 
     else:
         raise ValueError(f"Unsupported dataset: {name}")
