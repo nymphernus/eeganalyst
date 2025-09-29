@@ -3,11 +3,11 @@
 /* Общие настройки */
 body {
     font-family: "Segoe UI", "Roboto", sans-serif;
-    background-color: #F8F9FA;
+    background-color: #F1F3F5;
     margin: 0;
     padding: 0;
     box-sizing: border-box;
-    overflow-x: hidden; /* Запрещаем горизонтальную прокрутку */
+    overflow-x: hidden;
 }
 
 /* Заголовок */
@@ -33,11 +33,11 @@ body {
 
 /* Карточки */
 .card {
-    background-color: #FFFFFF;
+    background-color: #FAFBFD;
     padding: 20px;
     margin: 15px 0;
     border-radius: 10px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     width: 100%;
     max-width: none;
     box-sizing: border-box;
@@ -250,7 +250,7 @@ body {
     text-align: center;
     margin-top: 20px;
     padding: 16px;
-    background-color: #F8FAFC;
+    background-color: #F0F4F8;
     border: 1px solid #E2E8F0;
     border-radius: 8px;
 }
