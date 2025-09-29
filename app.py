@@ -40,9 +40,8 @@ def label_to_color(label: str) -> str:
 
 
 def _normalize_annotation_entry(entry: dict):
-    """Преобразует запись ТОЛЬКО в формат:
+    """Преобразует запись в формат:
     {'onset': float, 'duration': float, 'description': str}
-    Поддерживаются ТОЛЬКО ключи: onset, duration, description.
     """
     if not isinstance(entry, dict):
         return None
@@ -79,7 +78,6 @@ def parse_csv_or_json(contents, filename):
     """
     Загружает аннотации из CSV или JSON в формате:
     [{'onset':..., 'duration':..., 'description':...}]
-    Поддерживаются ТОЛЬКО колонки/ключи: onset, duration, description.
     """
     if not contents:
         return None, "Нет содержимого"
