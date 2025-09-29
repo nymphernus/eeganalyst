@@ -1,3 +1,17 @@
+"""
+Функционал:
+- Визуализация сигнала с возможностью прокрутки и выбора каналов
+- Выделение участков на графике → добавление аннотаций
+- Редактирование, удаление, сохранение аннотаций
+- Автосохранение и загрузка из CSV/JSON
+
+Формат аннотаций:
+{
+  "onset": 12.5,        # начало в секундах (float)
+  "duration": 0.8,      # длительность в секундах (float > 0)
+  "description": "eye_blink"  # метка (строка)
+}
+"""
 from dataset_loader import load_dataset, datasets_list as dtl
 
 import dash
@@ -15,15 +29,19 @@ from datetime import datetime
 from os import path as ospath, makedirs
 from mne import pick_types, Annotations
 
-# === Настройки приложения ===
-SAVE_FOLDER = "saved_annotations"
-AUTOSAVE_FOLDER = "autosave"
+# ГЛОБАЛЬНЫЕ НАСТРОЙКИ ПРИЛОЖЕНИЯ
+
+# Папки для сохранения аннотаций
+SAVE_FOLDER = "saved_annotations"      # ручные сохранения пользователя
+AUTOSAVE_FOLDER = "autosave"          # автоматические сохранения при изменении
 makedirs(SAVE_FOLDER, exist_ok=True)
 makedirs(AUTOSAVE_FOLDER, exist_ok=True)
 
-STEP_SECONDS = 5.0
-DEFAULT_DECIM = 1
+# Параметры навигации по сигналу
+STEP_SECONDS = 5.0        # шаг перемотки при нажатии "Вперёд/Назад"
+DEFAULT_DECIM = 1         # децимация по умолчанию (1 = без прореживания)
 
+# Создание Dash-приложения
 app = dash.Dash(__name__)
 app.title = "Разметка ЭЭГ"
 
@@ -88,7 +106,7 @@ def parse_csv_or_json(contents, filename):
     decoded = b64decode(content_string)
     txt = decoded.decode('utf-8', errors='ignore')
 
-    # ---- JSON ----
+    # Обработка JSON
     if filename.lower().endswith('.json'):
         try:
             obj = json.loads(txt)
@@ -105,7 +123,7 @@ def parse_csv_or_json(contents, filename):
         except Exception as e:
             return None, f"Ошибка парсинга JSON: {str(e)[:100]}"
 
-    # ---- CSV ----
+    # Обработка CSV
     try:
         df = pd.read_csv(BytesIO(decoded))
     except Exception as e:
@@ -113,9 +131,11 @@ def parse_csv_or_json(contents, filename):
     if df is None or df.shape[1] < 3:
         return None, "CSV должен содержать как минимум 3 колонки"
 
+    # Приведение названий колонок к нижнему регистру
     cols = [c.lower() for c in df.columns]
     df.columns = cols
 
+    # Проверка наличия обязательных колонок
     required = ['onset', 'duration', 'description']
     if not all(c in cols for c in required):
         return None, "CSV должен содержать колонки: onset, duration, description"
@@ -129,12 +149,12 @@ def parse_csv_or_json(contents, filename):
             if dur > 0:
                 anns.append({'onset': t0, 'duration': dur, 'description': lab})
         except Exception:
-            continue
+            continue    # пропускаем некорректные строки
     return anns, f"✅ Загружено {len(anns)} аннотаций (CSV)"
 
 
 def autosave_write(dataset_name, anns):
-    """Автосохранение в формате onset/duration/description."""
+    """Сохраняет аннотации в папку autosave в формате JSON"""
     fname = ospath.join(AUTOSAVE_FOLDER, f"autosave_{dataset_name}.json")
     try:
         with open(fname, 'w', encoding='utf-8') as f:
@@ -146,7 +166,7 @@ def autosave_write(dataset_name, anns):
 
 
 def autosave_read(dataset_name):
-    """Загрузка автосохранения (только новый формат)."""
+    """Загружает автосохранённые аннотации для указанного датасета"""
     fname = ospath.join(AUTOSAVE_FOLDER, f"autosave_{dataset_name}.json")
     try:
         if not ospath.exists(fname):
@@ -164,9 +184,10 @@ def autosave_read(dataset_name):
         return []
 
 
-# --- Макет интерфейса ---
+# Интерфейс
 
 app.layout = html.Div([
+    # Блок выбора датасета и загрузки аннотаций
     html.Div([
         html.H3("📁 Данные", className="section-title"),
         html.Div([
@@ -193,6 +214,7 @@ app.layout = html.Div([
         ], className="data-row")
     ], className="card"),
 
+    # Блок настроек отображения
     html.Div([
         html.H3("⚙️ Настройки", className="section-title"),
         html.Div([
@@ -216,18 +238,22 @@ app.layout = html.Div([
         ], className="settings-row")
     ], className="card"),
 
+    # Блок графика и аннотирования
     html.Div([
         html.H3("📊 Сигнал", className="section-title"),
+        # Кнопки навигации
         html.Div([
             html.Button('⏮ Назад', id='seek-back-btn', n_clicks=0, className="seek-btn"),
             html.Button('⏭ Вперёд', id='seek-forward-btn', n_clicks=0, className="seek-btn"),
             html.Span(id='export-feedback')
         ], className="seek-controls"),
+        # График ЭЭГ
         dcc.Graph(id='eeg-graph', config={
             'modeBarButtonsToRemove': ['zoom2d','pan2d','zoomIn2d','zoomOut2d',
                                        'autoScale2d','resetScale2d','toImage'],
             'displayModeBar': True, 'displaylogo': False
         }),
+        # Форма добавления аннотации (появляется после выделения)
         html.Div(id='annotation-input-area', className="annotation-input-area hidden", children=[
             html.Div(id='selection-info', className="feedback"),
             html.Div([
@@ -238,6 +264,7 @@ app.layout = html.Div([
         ])
     ], className="card graph-container"),
 
+    # Блок таблицы аннотаций и сохранения
     html.Div([
         html.H3("📝 Аннотации", className="section-title"),
         html.Div(id='annotations-table'),
@@ -249,15 +276,15 @@ app.layout = html.Div([
         html.Div(id='save-feedback', className="feedback")
     ], className="card"),
 
-    dcc.Store(id='annotations-store', data=[]),
-    dcc.Store(id='current-selection', data=None),
-    dcc.Store(id='raw-info', data={}),
-    dcc.Store(id='current-dataset', data='sample'),
-    dcc.Store(id='last-delete-idx', data=None)
+    # Невидимые хранилища данных (для передачи между callback'ами)
+    dcc.Store(id='annotations-store', data=[]),          # текущие аннотации
+    dcc.Store(id='current-selection', data=None),        # текущее выделение на графике
+    dcc.Store(id='raw-info', data={}),                   # информация о сигнале (sfreq, duration)
+    dcc.Store(id='current-dataset', data=None),      # текущий датасет
 ])
 
 
-# === Callbacks ===
+# Callbacks
 
 @app.callback(
     [Output('channel-dropdown', 'options'),
@@ -269,15 +296,17 @@ app.layout = html.Div([
     Input('dataset-dropdown', 'value')
 )
 def update_dataset(dataset_name):
+    """
+    Загружает выбранный датасет, обновляет список каналов и информацию о сигнале.
+    Также загружает автосохранённые аннотации, если текущий список пуст.
+    """
     try:
         raw = load_dataset(dataset_name)
-        picks = pick_types(raw.info, eeg=True, meg=False, exclude='bads')
+        # Выбор EEG-каналов
+        picks = pick_types(raw.info, eeg=True, exclude='bads')
         if len(picks) == 0:
-            picks = pick_types(raw.info, eeg=False, meg=True, exclude='bads')
-        if len(picks) == 0:
-            picks = pick_types(raw.info, eeg=True, meg=True, exclude='bads')
-        if len(picks) == 0:
-            picks = list(range(len(raw.ch_names)))
+            raise ValueError("В Датасете нет каналов ЭЭГ")
+
         channels = [raw.ch_names[i] for i in picks]
         duration = float(raw.times[-1])
         autos = autosave_read(dataset_name)
@@ -305,6 +334,10 @@ def update_dataset(dataset_name):
     prevent_initial_call=True
 )
 def upload_annotations(contents, filename, dataset):
+    """
+    Обрабатывает загрузку файла с аннотациями (CSV/JSON).
+    После успешной загрузки выполняет автосохранение.
+    """
     if not contents:
         return dash.no_update, ""
     anns, msg = parse_csv_or_json(contents, filename)
@@ -327,6 +360,13 @@ def upload_annotations(contents, filename, dataset):
     prevent_initial_call=False
 )
 def update_graph(channels, window_dur, start_time, annotations, raw_info, decim, dataset_name):
+    """
+    Обновляет график ЭЭГ:
+    - Загружает данные для выбранных каналов и временного окна
+    - Применяет децимацию для ускорения отрисовки
+    - Рисует аннотации как цветные полосы
+    - Фиксирует масштаб по оси Y для стабильности при прокрутке
+    """
     if not all([channels, raw_info, dataset_name]):
         return go.Figure()
     if isinstance(channels, str):
@@ -339,18 +379,22 @@ def update_graph(channels, window_dur, start_time, annotations, raw_info, decim,
     start_samp = int(start_time * sfreq)
     end_samp = int(end_time * sfreq)
 
+    # Расчёт глобального масштаба для стабильного отображения
     picks = [raw.ch_names.index(ch) for ch in channels]
     full_data = raw.get_data(picks=picks)
     global_max_ampl = np.max(np.abs(full_data)) if full_data.size > 0 else 1.0
-    separation = global_max_ampl * 3.0
+    separation = global_max_ampl * 3.0 # вертикальный отступ между каналами
 
+    # Данные для текущего окна
     window_data = raw.get_data(picks=picks, start=start_samp, stop=end_samp)
     times = np.arange(start_samp, end_samp) / sfreq
 
+    # Децимация (прореживание) для ускорения
     if decim > 1:
         window_data = window_data[:, ::decim]
         times = times[::decim]
 
+    # Построение графика
     fig = go.Figure()
     offsets = [i * separation for i in range(len(channels))]
 
@@ -358,6 +402,7 @@ def update_graph(channels, window_dur, start_time, annotations, raw_info, decim,
         y = window_data[i, :] + offsets[i]
         fig.add_trace(go.Scatter(x=times, y=y, mode='lines', name=ch, line=dict(width=1)))
 
+    # Отображение аннотаций
     for ann in (annotations or []):
         try:
             t0 = float(ann['onset'])
@@ -377,6 +422,7 @@ def update_graph(channels, window_dur, start_time, annotations, raw_info, decim,
             font=dict(size=10, color=color)
         )
 
+    # Фиксированный масштаб по Y
     total_offset = offsets[-1] if offsets else 0
     y_min = -global_max_ampl
     y_max = total_offset + global_max_ampl
@@ -404,6 +450,10 @@ def update_graph(channels, window_dur, start_time, annotations, raw_info, decim,
     prevent_initial_call=True
 )
 def handle_selection(sel, start, window):
+    """
+    Обрабатывает выделение участка на графике.
+    Показывает форму ввода метки, если выделение корректно.
+    """
     if not sel or 'range' not in sel:
         return None, "", "annotation-input-area hidden"
     x0, x1 = sel['range']['x']
@@ -426,6 +476,10 @@ def handle_selection(sel, start, window):
     prevent_initial_call=True
 )
 def add_annotation(nc, sel, label, anns, dataset):
+    """
+    Добавляет новую аннотацию на основе выделенного участка и введённой метки.
+    Выполняет автосохранение после добавления.
+    """
     if not sel:
         return anns, "⚠️ Нет выделения для добавления"
     if not label or not label.strip():
@@ -447,6 +501,9 @@ def add_annotation(nc, sel, label, anns, dataset):
     prevent_initial_call=True
 )
 def clear_annotations(_n, dataset):
+    """
+    Очищает все аннотации и сохраняет пустой список в автосохранение.
+    """
     autosave_write(dataset, [])
     return []
 
@@ -456,6 +513,10 @@ def clear_annotations(_n, dataset):
     Input('annotations-store', 'data')
 )
 def update_table(anns):
+    """
+    Генерирует таблицу для отображения и редактирования аннотаций.
+    Каждая ячейка — редактируемое поле.
+    """
     if not anns:
         return html.P("Нет аннотаций", className="feedback")
     rows = []
@@ -509,6 +570,7 @@ def update_table(anns):
     prevent_initial_call=True
 )
 def delete_annotation(n_clicks_list, anns, dataset):
+    """Удаляет аннотацию по индексу (кнопка в таблице)."""
     if not anns:
         return anns
     for i, n in enumerate(n_clicks_list):
@@ -529,6 +591,7 @@ def delete_annotation(n_clicks_list, anns, dataset):
     prevent_initial_call=True
 )
 def edit_onset(values, anns, dataset):
+    """Обновляет значение 'onset' при изменении в таблице."""
     if anns is None:
         return anns
     new = list(anns)
@@ -554,6 +617,7 @@ def edit_onset(values, anns, dataset):
     prevent_initial_call=True
 )
 def edit_duration(values, anns, dataset):
+    """Обновляет значение 'duration' при изменении в таблице."""
     if anns is None:
         return anns
     new = list(anns)
@@ -579,6 +643,7 @@ def edit_duration(values, anns, dataset):
     prevent_initial_call=True
 )
 def edit_description(values, anns, dataset):
+    """Обновляет значение 'description' при изменении в таблице."""
     if anns is None:
         return anns
     new = list(anns)
@@ -600,6 +665,7 @@ def edit_description(values, anns, dataset):
     prevent_initial_call=True
 )
 def seek(back, forward, start_val):
+    """Обрабатывает нажатие кнопок 'Назад' и 'Вперёд'."""
     ctx = dash.callback_context
     if not ctx.triggered:
         return start_val
@@ -622,6 +688,9 @@ def seek(back, forward, start_val):
     prevent_initial_call=True
 )
 def save_to_disk(save_csv, save_json, anns, dataset):
+    """
+    Сохраняет аннотации в CSV или JSON в папку saved_annotations.
+    """
     ctx = dash.callback_context
     if not ctx.triggered:
         return ""
@@ -653,8 +722,9 @@ def save_to_disk(save_csv, save_json, anns, dataset):
     prevent_initial_call=False
 )
 def autosave_callback(anns, dataset):
+    """Выполняет автосохранение при каждом изменении списка аннотаций."""
     ok = autosave_write(dataset, anns or [])
-    return "" if ok else "Autosave failed"
+    return "" if ok else "Ошибка автосохранения"
 
 
 @app.callback(
@@ -664,6 +734,9 @@ def autosave_callback(anns, dataset):
     prevent_initial_call=True
 )
 def load_autosave(dataset, current):
+    """
+    При смене датасета загружает автосохранение, если текущий список аннотаций пуст.
+    """
     autos = autosave_read(dataset)
     if autos and (not current or len(current)==0):
         return autos
