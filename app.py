@@ -224,16 +224,18 @@ app.layout = html.Div([
             ], className="settings-col settings-col-left"),
             html.Div([
                 html.Label("Длительность окна (сек):"),
-                dcc.Slider(id='window-slider', min=2, max=120, step=1, value=10,
-                           marks={i: str(i) for i in range(2,121,10)}),
+                dcc.Slider(id='window-slider', min=1, max=60, step=1, value=10,
+                           tooltip={"placement":"bottom", "always_visible": True},
+                           marks=None),
                 html.Br(),
                 html.Label("Начало окна (сек):"),
-                dcc.Slider(id='start-slider', min=0, max=100, step=0.1, value=0,
-                           tooltip={"placement":"bottom"}),
+                dcc.Slider(id='start-slider', min=0, step=0.1, value=0,
+                           tooltip={"placement":"bottom", "always_visible": True},
+                           marks=None),
                 html.Br(),
                 html.Label("Децимация:"),
-                dcc.Slider(id='decim-slider', min=1, max=20, step=1, value=DEFAULT_DECIM,
-                           marks={1:'1',2:'2',5:'5',10:'10',20:'20'})
+                dcc.Slider(id='decim-slider', min=1, max=10, step=1, value=DEFAULT_DECIM,
+                           marks={1:'1',2:'2',3:'3',4:'4',5:'5',6:'6',7:'7',8:'8',9:'9',10:'10'})
             ], className="settings-col settings-col-right"),
         ], className="settings-row")
     ], className="card"),
@@ -241,18 +243,18 @@ app.layout = html.Div([
     # Блок графика и аннотирования
     html.Div([
         html.H3("📊 Сигнал", className="section-title"),
-        # Кнопки навигации
-        html.Div([
-            html.Button('⏮ Назад', id='seek-back-btn', n_clicks=0, className="seek-btn"),
-            html.Button('⏭ Вперёд', id='seek-forward-btn', n_clicks=0, className="seek-btn"),
-            html.Span(id='export-feedback')
-        ], className="seek-controls"),
         # График ЭЭГ
         dcc.Graph(id='eeg-graph', config={
             'modeBarButtonsToRemove': ['zoom2d','pan2d','zoomIn2d','zoomOut2d',
                                        'autoScale2d','resetScale2d','toImage'],
             'displayModeBar': True, 'displaylogo': False
         }),
+        # Кнопки навигации
+        html.Div([
+            html.Button('⏮ Назад', id='seek-back-btn', n_clicks=0, className="seek-btn"),
+            html.Button('⏭ Вперёд', id='seek-forward-btn', n_clicks=0, className="seek-btn"),
+            html.Span(id='export-feedback')
+        ], className="seek-controls"),
         # Форма добавления аннотации (появляется после выделения)
         html.Div(id='annotation-input-area', className="annotation-input-area hidden", children=[
             html.Div(id='selection-info', className="feedback"),
@@ -267,12 +269,12 @@ app.layout = html.Div([
     # Блок таблицы аннотаций и сохранения
     html.Div([
         html.H3("📝 Аннотации", className="section-title"),
-        html.Div(id='annotations-table'),
         html.Div([
             html.Button('🗑️ Очистить все', id='clear-annotations-btn', n_clicks=0, className="btn"),
             html.Button('💾 Сохранить CSV', id='save-local-csv-btn', n_clicks=0, className="btn"),
             html.Button('💾 Сохранить JSON', id='save-local-json-btn', n_clicks=0, className="btn"),
         ], className="save-buttons"),
+        html.Div(id='annotations-table'),
         html.Div(id='save-feedback', className="feedback")
     ], className="card"),
 
