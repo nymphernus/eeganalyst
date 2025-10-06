@@ -27,7 +27,32 @@ def _get_safe_n_jobs():
     except Exception:
         return 1
     
-
+def _get_model_parameters_list(cls):
+    """Получить список доступных параметров модели"""
+    if cls is None:
+        return []
+    
+    try:
+        sig = signature(cls.__init__)
+        parameters = []
+        
+        for name, param in sig.parameters.items():
+            if name == 'self':
+                continue
+                
+            param_info = name
+            if param.default != param.empty:
+                param_info += f" (по умолчанию: {param.default})"
+            else:
+                param_info += " [обязательный]"
+                
+            parameters.append(param_info)
+        
+        return parameters
+    
+    except Exception:
+        return []
+    
 # ИМПОРТ МОДЕЛЕЙ
 def _import_rocket():
     try:
@@ -36,7 +61,7 @@ def _import_rocket():
     except ImportError:
         warn("ROCKET недоступен")
         return None
-    
+       
 def _import_tsf():
     try:
         from sktime.classification.interval_based import TimeSeriesForestClassifier
@@ -47,10 +72,10 @@ def _import_tsf():
 
 def _import_weasel():
     try:
-        from sktime.classification.dictionary_based import WEASEL
-        return WEASEL
+        from sktime.classification.dictionary_based import MUSE
+        return MUSE
     except ImportError:
-        warn("WEASEL недоступен")
+        warn("MUSE недоступен")
         return None
 
 def _import_stc():
@@ -66,15 +91,34 @@ def _import_stc():
 # Ключ: имя модели (для использования в коде)
 # Значение: функция, возвращающая экземпляр модели
 
-_MODEL_REGISTRY: Dict[str, Callable[[], Any]] = {
-    "ROCKET": _import_rocket(),
-    "TSF": _import_tsf(),
-    "WEASEL": _import_weasel(),
-    "STC": _import_stc(),
+_MODEL_REGISTRY: Dict[str, Dict[str, Any]] = {
+    "ROCKET": {
+        "class": _import_rocket(), 
+        "parameters": _get_model_parameters_list(_import_rocket()),
+        "description": "1"
+    },
+    "TSF": {
+        "class": _import_tsf(), 
+        "parameters": _get_model_parameters_list(_import_tsf()),
+        "description": "2"
+    },
+    "MUSE": {
+        "class": _import_weasel(), 
+        "parameters": _get_model_parameters_list(_import_weasel()),
+        "description": "3"
+    },
+    "STC": {
+        "class": _import_stc(), 
+        "parameters": _get_model_parameters_list(_import_stc()),
+        "description": "4"
+    },
 }
 
 # Удаляем недоступные модели
-_MODEL_REGISTRY = {k: v for k, v in _MODEL_REGISTRY.items() if v is not None}
+_MODEL_REGISTRY = {
+    name: meta for name, meta in _MODEL_REGISTRY.items()
+    if meta["class"] is not None
+}
 
 
 def get_model(model_name: str, *args, **kwargs):
@@ -87,7 +131,7 @@ def get_model(model_name: str, *args, **kwargs):
         available = ", ".join(_MODEL_REGISTRY.keys())
         raise ValueError(f"Модель '{model_name}' не найдена. Доступные: {available}")
     
-    cls = _MODEL_REGISTRY[model_name]
+    cls = _MODEL_REGISTRY[model_name]["class"]
     
     # дефолтные параметры
     defaults = {"random_state": 42, "n_jobs": _get_safe_n_jobs()}
@@ -97,10 +141,17 @@ def get_model(model_name: str, *args, **kwargs):
 
     # фильтруем параметры
     params = _filter_kwargs(cls, defaults)
-    
+    print(params)
     return cls(*args, **params)
 
 
 def list_models() -> list:
-    """Возвращает список доступных моделей."""
+    """Возвращает список доступных моделей"""
     return list(_MODEL_REGISTRY.keys())
+
+def model_description(model_name: str) -> str:
+    params_list = _MODEL_REGISTRY[model_name]["parameters"]
+    description = _MODEL_REGISTRY[model_name]["description"]
+    parameters = "\n".join(f"- {param}" for param in params_list)
+    # return  description + "\n" + parameters
+    return parameters

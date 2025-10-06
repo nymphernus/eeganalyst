@@ -745,5 +745,5 @@ def load_autosave(dataset, current):
     return current
 
 
-if __name__ == '__main__':
-    app.run(debug=True)
+if __name__ == "__main__":
+    app.run(debug=False, port=8050)
