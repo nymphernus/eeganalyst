@@ -1,4 +1,4 @@
-# EEG Insights Agent (EEGIA)
+# EEG Analyst
 
 ## 📋 Описание
 
